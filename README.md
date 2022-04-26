@@ -1,4 +1,19 @@
-Setup:
+# Summary of application
+
+This application takes a folder of unzipped SAR-images (with polarization VV+VH), a numerical approximation
+of the wave height in the baltic sea and a shapefile over the coastline of the baltic sea to create two separate datasets
+meant for a CNN and a ANN to train on.
+
+The program preprocesses the SAR-image, subdivides in into nxn pixel wide subimages, checks for land, checks for 
+homogeneity, selects images to create an even distribution, matches the subimage with the numerical approximation to 
+apply a label to the data, writes the subimages to tif files, writes the csv files.
+
+The output is a folder of labeled subimages in tif files and a csv file where every row consists of the mean, variance 
+and label of all subimages.
+
+-----------------------------------------------------------------------------------------------
+
+# Setup
 
 1. Create a new virtual environment in Anaconda. In anaconda prompt:
     conda create -n py36
@@ -43,7 +58,7 @@ Setup:
     
 8. Download
     1. shapefile:      https://studentchalmersse-my.sharepoint.com/:u:/g/personal/alvinge_net_chalmers_se/EQoILgavBvZMp_W_R9owZPYBRTuloFlMPcs6tKNr_7Qt8A?e=1YcFpn
-    2. Model data:     Soon...
+    2. Model data:     https://drive.google.com/file/d/1xVw1aGQtT0iSmt3NlpEqxl-4slABKKR_/view?usp=sharing
 
 9. Set up the following directories. All paths are relative, so you should not have to change any paths
    /Project
@@ -61,6 +76,8 @@ Setup:
 10. Select options in "preprocessing". You are now ready to run the program.
 
 -----------------------------------------------------------------------------------------------    
+
+# Notes
 
 To remove all old data and memory, run the reset script. Be careful as this removes all written data in both the csv
 and the images for the CNN. It also resets the folder counter and the bucket counter.
