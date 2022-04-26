@@ -262,7 +262,7 @@ def do_apply_orbit_file(source):
 
     parameters.put('orbitType', 'Sentinel Restituted (Auto Download)')
     parameters.put('polyDegree', '3')
-    parameters.put('continueOnFail', 'true')
+    parameters.put('continueOnFail', 'false')
 
     output = GPF.createProduct('Apply-Orbit-File', parameters, source)
     return output
