@@ -20,13 +20,16 @@ from numpy import exp, loadtxt, pi, sqrt
 from netCDF4 import Dataset
 import random
 import csv
+import matplotlib.pyplot as plt
+import pandas as pd
+
 
 # ----------------------------------------------------------------
 # ------------------------- OPTIONS ------------------------------
 # ----------------------------------------------------------------
 
 # If images are to be written, for CNN
-will_write_img = True
+will_write_img = False
 
 # If CSV file is to be written, for regression network
 will_write_csv = True
@@ -38,7 +41,7 @@ include_azm = False
 even_distribution = True
 
 # If the selection process should be randomized for common wave heights, only works with even distribution
-slow_down_selection = False
+slow_down_selection = True
 
 # Amount of pixels in each sub-image
 n = 200
@@ -47,12 +50,11 @@ n = 200
 bucket_size = 0.2
 
 # Maximum amount of waves per bucket
-bucket_max = 1000
+bucket_max = 8
 
 # Minimum and maximum wave height to be sorted in meters
 min_wave = 0
 max_wave = 4
-
 # ----------------------------------------------------------------
 # ----------------------------------------------------------------
 # ----------------------------------------------------------------
@@ -72,18 +74,39 @@ preprocessed_path = r'data\s1_preprocessed'
 output_path = r'data\img_output'
 shapefile = r'data\shapefile\GSHHS_f_L1.shp'
 output_csv = r'data\csv_output\params.csv'
-cop_file = r'data\model_data\majsep2020.nc'
+cop_file = r'data\model_data\majsep2021.nc'
 numpy_path = r'memory\amt_in_buckets.npy'
 processed_files_path = r'memory\processed_files.npy'
+processed_rows_path = r'memory\processed_rows.npy'
 
 copernicus = Dataset(cop_file, mode='r')
+time_len = len(copernicus.variables['time'][:])
+time_arr = np.zeros(time_len)
+
+if cop_file == r'data\model_data\majsep2020.nc':
+    time_arr[0] = 1588284000
+elif cop_file == r'data\model_data\majsep2021.nc':
+    time_arr[0] = 1619820000
+
+for i in range(time_len - 1):
+    time_arr[i + 1] = time_arr[i] + 3600
+
+
+#super_arr = np.array(copernicus.variables['VHM0'][:, :, :]).flatten()
+#n, bins, patches = plt.hist(super_arr, 100, range=(0, 5.5), density=False, facecolor='g')
+
+plt.xlabel('Wave height')
+plt.ylabel('Number of waves')
+plt.title('Histogram of wave height')
+plt.xlim(0, 5.5)
+plt.show()
+
 
 # Reads variables from Copernicus file
 lons = copernicus.variables['lon'][:]
 lats = copernicus.variables['lat'][:]
 VHM0 = copernicus.variables['VHM0'][:]
 Time = copernicus.variables['time'][:]
-
 
 
 # Loads numpy vector with information about number of images per wave height bucket
@@ -95,6 +118,11 @@ if not os.path.exists(numpy_path):
 if not os.path.exists(processed_files_path):
     empty_arr = np.array([], dtype='object')
     np.save(processed_files_path, empty_arr)
+
+
+if not os.path.exists(processed_rows_path):
+    empty_arr = np.zeros(1)
+    np.save(processed_rows_path, empty_arr)
 
 
 # Help variables for printing
@@ -110,7 +138,7 @@ index = 0
 
 # Returns the value of an upside down bell curve
 def probability_curve(wave_height):
-    return min(-math.exp(-(((wave_height - 1)**8)/0.2)) + 1.01, 1)
+    return min(-math.exp(-(((wave_height - 0.682)**10)/0.0001)) + 1.1, 1)
 
 
 # Determines if a wave is rejected or not given its probability
@@ -403,6 +431,10 @@ def main():
             # Prints information about current file
             amt_in_buckets = np.load(numpy_path)
 
+            processed_row = np.load(processed_rows_path)[0]
+            if row < processed_row:
+                continue
+
             print_info_of_row(count, row, dim_y, kept_land, kept_homo, thrown_land, thrown_homo, np.count_nonzero(amt_in_buckets[0:bucket_arr_size-1] == bucket_max), amt_in_buckets[bucket_arr_size])
 
             for col in range(dim_x):
@@ -448,8 +480,9 @@ def main():
 
                         # Chooses the closest time available from the model_data data
                         absolute_difference_function = lambda list_value: abs(list_value - float(date_as_unix))
-                        closest_time = min(Time, key=absolute_difference_function)
-                        time_index = int(np.where(Time == closest_time)[0][0])
+                        closest_time = min(time_arr, key=absolute_difference_function)
+                        time_index = int(np.where(time_arr == closest_time)[0])
+
 
                         # Sets index for lats and longs
                         lat_low_ind = np.argmin(np.abs(lats - min_lat))
@@ -498,12 +531,13 @@ def main():
                             azm = str(truncate(azimuth_value, nr_dec))
 
                         mean = str(truncate(np.mean(subset_data), nr_dec))
-                        var = str(truncate(np.var(subset_data * math.pow(10, 2)), nr_dec))
+                        var = str(truncate(np.var(subset_data) * 1000, nr_dec))
 
                         wave_str = str(truncate(wave_approx, 8))
 
                         if abs(closest_time - date_as_unix) > 1800:
                             print('Time diff greater than 1800. Time diff: ' + str(abs(closest_time - date_as_unix)))
+                            continue
 
                         # Creates the final subset without metadata
                         output_name = output_path + '\\' + wave_str + '_' + azm if include_azm else output_path + '\\' + wave_str
@@ -528,6 +562,9 @@ def main():
                 else:
                     kept_land += 1
 
+            np.save(processed_rows_path, np.array([row]))
+
+        np.save(processed_rows_path, np.array([0]))
         sentinel_1.dispose()
         s1_preprocessed.dispose()
         mask.dispose()

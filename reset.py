@@ -3,6 +3,7 @@ import os
 numpy_path = r'memory\amt_in_buckets.npy'
 processed_files_path = r'memory\processed_files.npy'
 output_csv = r'data\csv_output\params.csv'
+processed_rows_path = r'memory\processed_rows.npy'
 
 print('***********************************')
 print('************ WARNING **************')
@@ -21,6 +22,9 @@ if os.path.exists(numpy_path):
 
 if os.path.exists(output_csv):
     os.remove(output_csv)
+
+if os.path.exists(processed_rows_path):
+    os.remove(processed_rows_path)
 
 for file in os.listdir(r'data\img_output'):
     os.remove(r'data\img_output' + '\\' + file)
