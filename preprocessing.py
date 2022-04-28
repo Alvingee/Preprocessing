@@ -29,10 +29,10 @@ import pandas as pd
 # ----------------------------------------------------------------
 
 # If images are to be written, for CNN
-will_write_img = False
+will_write_img = True
 
 # If CSV file is to be written, for regression network
-will_write_csv = False
+will_write_csv = True
 
 # If azimuth cutoff should be included
 include_azm = False
@@ -92,13 +92,13 @@ for i in range(time_len - 1):
     time_arr[i + 1] = time_arr[i] + 3600
 
 
-#super_arr = np.array(copernicus.variables['VHM0'][:, :, :]).flatten()
-#n, bins, patches = plt.hist(super_arr, 100, range=(0, 5.5), density=False, facecolor='g')
+super_arr = np.array(copernicus.variables['VHM0'][:, :, :]).flatten()
+n, bins, patches = plt.hist(super_arr, 25, range=(0, 2.5), density=False, facecolor='g')
 
 plt.xlabel('Wave height')
 plt.ylabel('Number of waves')
 plt.title('Histogram of wave height')
-plt.xlim(0, 5.5)
+plt.xlim(0, 2.5)
 plt.show()
 
 
@@ -502,10 +502,10 @@ def main():
                             # Calculates which bucket the wave height will be sorted into
                             bucket_index = 0
 
-                            counter = 0
-
                             if wave_approx > max_wave:
                                 continue
+
+                            counter = 0
 
                             for i in range(min_wave*10, max_wave*10, int(bucket_size*10)):
                                 if i/10 <= wave_approx <= i/10 + bucket_size:
