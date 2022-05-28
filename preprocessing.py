@@ -16,51 +16,62 @@ import time
 import os
 import gc
 from lmfit import Model
-from numpy import exp, loadtxt, pi, sqrt
+from numpy import exp, pi, sqrt
 from netCDF4 import Dataset
 import random
 import csv
-import matplotlib.pyplot as plt
-import pandas as pd
 
 
 # ----------------------------------------------------------------
 # ------------------------- OPTIONS ------------------------------
 # ----------------------------------------------------------------
 
+
 # If images are to be written, for CNN
 will_write_img = True
 
+
 # If CSV file is to be written, for regression network
-will_write_csv = True
+will_write_csv = False
+
 
 # If azimuth cutoff should be included
 include_azm = False
 
+
 # If the dataset should be evenly distributed across all wave heights
-even_distribution = True
+even_distribution = False
+
 
 # If the selection process should be randomized for common wave heights, only works with even distribution
-slow_down_selection = True
+slow_down_selection = False
+
 
 # Amount of pixels in each sub-image
 n = 200
 
+
 # Size of each bucket of waves in meters
 bucket_size = 0.2
+
 
 # Maximum amount of waves per bucket
 bucket_max = 8000
 
+
 # Minimum and maximum wave height to be sorted in meters
 min_wave = 0
 max_wave = 4
+
+
 # ----------------------------------------------------------------
 # ----------------------------------------------------------------
 # ----------------------------------------------------------------
 
+
 # Number of buckets in array
 bucket_arr_size = int((max_wave - min_wave)/bucket_size)
+
 
 # Suppresses a bunch of messages
 Logger.getLogger('').setLevel(Level.OFF)
@@ -68,38 +79,35 @@ snappy.SystemUtils.LOG.setLevel(Level.OFF)
 System.setOut(PrintStream(NullStream()))
 System.setErr(PrintStream(NullStream()))
 
+
 # Paths to data folders
 unprocessed_path = r'data\s1_unprocessed'
 preprocessed_path = r'data\s1_preprocessed'
 output_path = r'data\img_output'
 shapefile = r'data\shapefile\GSHHS_f_L1.shp'
 output_csv = r'data\csv_output\params.csv'
-cop_file = r'data\model_data\majsep2021.nc'
+cop_file = r'data\model_data\majsep2020.nc'
 numpy_path = r'memory\amt_in_buckets.npy'
 processed_files_path = r'memory\processed_files.npy'
 processed_rows_path = r'memory\processed_rows.npy'
 
+
+# Creates a dataset for the wave model
 copernicus = Dataset(cop_file, mode='r')
 time_len = len(copernicus.variables['time'][:])
 time_arr = np.zeros(time_len)
 
+
+# Checks what year we are using, for creating time array
 if cop_file == r'data\model_data\majsep2020.nc':
     time_arr[0] = 1588284000
 elif cop_file == r'data\model_data\majsep2021.nc':
     time_arr[0] = 1619820000
 
+
+# Creates a time array for matching
 for i in range(time_len - 1):
     time_arr[i + 1] = time_arr[i] + 3600
-
-
-super_arr = np.array(copernicus.variables['VHM0'][:, :, :]).flatten()
-n, bins, patches = plt.hist(super_arr, 25, range=(0, 2.5), density=False, facecolor='g')
-
-plt.xlabel('Wave height')
-plt.ylabel('Number of waves')
-plt.title('Histogram of wave height')
-plt.xlim(0, 2.5)
-plt.show()
 
 
 # Reads variables from Copernicus file
@@ -115,11 +123,13 @@ if not os.path.exists(numpy_path):
     np.save(numpy_path, empty_arr)
 
 
+# Creates numpy file with information about processed files
 if not os.path.exists(processed_files_path):
     empty_arr = np.array([], dtype='object')
     np.save(processed_files_path, empty_arr)
 
 
+# Creates numpy file with information about processed rows in file
 if not os.path.exists(processed_rows_path):
     empty_arr = np.zeros(1)
     np.save(processed_rows_path, empty_arr)
@@ -135,6 +145,7 @@ index = 0
 # ----------------------------------------------------------------
 # --------------------------HELPERS-------------------------------
 # ----------------------------------------------------------------
+
 
 # Returns the value of an upside down bell curve
 def probability_curve(wave_height):
@@ -163,12 +174,13 @@ def azimuth_cutoff(band, x, y):
     return acw
 
 
+# Creates a gaussian fit for azimuth cutoff
 def gaussian(x, amp, cen, wid):
     """1-d gaussian: gaussian(x, amp, cen, wid)"""
     return (amp / (sqrt(2 * pi) * wid)) * exp(-(x - cen) ** 2 / (2 * wid ** 2))
 
 
-# Prints an approximation of the remaining time for all files
+# Prints information about processed files
 def print_info_of_row(count, row, dim_y, kept_land, kept_homo, thrown_land, thrown_homo, filled_buckets, processed):
 
     if row == 0:
@@ -290,7 +302,7 @@ def do_apply_orbit_file(source):
 
     parameters.put('orbitType', 'Sentinel Restituted (Auto Download)')
     parameters.put('polyDegree', '3')
-    parameters.put('continueOnFail', 'false')
+    parameters.put('continueOnFail', 'true')
 
     output = GPF.createProduct('Apply-Orbit-File', parameters, source)
     return output
@@ -344,9 +356,8 @@ def do_speckle_filtering(source):
 # ----------------------------------------------------------------
 
 def main():
-    # Start time for measuring elapsed time
-    start_time_tot = time.time()
 
+    # Loads file containing information about processed files
     processed_files = np.load(processed_files_path, allow_pickle=True)
     count = processed_files.size + 1
 
@@ -370,6 +381,7 @@ def main():
         # ------------------------CREATING SUBSETS------------------------
         # ----------------------------------------------------------------
 
+        # Garbage collection
         gc.enable()
         gc.collect()
 
@@ -415,14 +427,12 @@ def main():
         # Holds the actual data from the land mask
         band = mask.getBand("Sigma0_VV")
 
-        # Uncomment to write the preprocessed land mask to output
-        # ProductIO.writeProduct(mask, preprocessed_path + '\\' + "test_new", 'GeoTIFF')
-
         print("-----------------------------------------------------------")
         print("Preprocessing done!")
         print("Will subdivide image into %s sub-images with dimensions %s x %s" % (dim_x * dim_y, dim_x, dim_y))
         print("-----------------------------------------------------------")
 
+        # Measures time per file
         start_time_file = time.time()
 
         # Main loop through every individual SAR image
@@ -430,8 +440,8 @@ def main():
 
             # Prints information about current file
             amt_in_buckets = np.load(numpy_path)
-
             processed_row = np.load(processed_rows_path)[0]
+
             if row < processed_row:
                 continue
 
@@ -444,13 +454,16 @@ def main():
 
                 # Checks for every square in the image if it contains land and is homogeneous
                 if not land_exists(band, x, y):
+
                     thrown_land += 1
+
                     if is_homogeneous(band, x, y):
                         kept_homo += 1
 
                         # Creates the subset
                         subset = create_subset(s1_preprocessed, x, y, n, n, False)
 
+                        # Checks for reasonable azimuth value
                         if include_azm:
                             azimuth_value = azimuth_cutoff(band, x, y)
                             if not 50 <= azimuth_value <= 250:
@@ -467,8 +480,6 @@ def main():
                         long_br = subset.getMetadataRoot().getElementAt(1).getAttributeDouble("last_far_long")
                         long_bl = subset.getMetadataRoot().getElementAt(1).getAttributeDouble("last_near_long")
 
-
-
                         # Number of decimals in coordinates
                         nr_dec = 4
 
@@ -483,7 +494,6 @@ def main():
                         closest_time = min(time_arr, key=absolute_difference_function)
                         time_index = int(np.where(time_arr == closest_time)[0])
 
-
                         # Sets index for lats and longs
                         lat_low_ind = np.argmin(np.abs(lats - min_lat))
                         lat_upp_ind = np.argmin(np.abs(lats - max_lat))
@@ -493,6 +503,7 @@ def main():
                         # Approximated wave height
                         wave_approx = np.mean(copernicus.variables['VHM0'][time_index, lat_low_ind:lat_upp_ind, long_low_ind:long_upp_ind])
 
+                        # Errors occurs sometimes in matching, this discards those
                         if type(wave_approx) == np.ma.core.MaskedConstant:
                             continue
 
@@ -513,7 +524,6 @@ def main():
                                     continue
                                 counter += 1
 
-
                             # Loads the bucket data and checks if that bucket is full
                             amt_in_buckets = np.load(numpy_path)
 
@@ -528,6 +538,7 @@ def main():
                             amt_in_buckets[bucket_arr_size] = amt_in_buckets[bucket_arr_size] + 1
                             np.save(numpy_path, amt_in_buckets)
 
+                        # Loads the data
                         subset_band = subset.getBand("Sigma0_VV")
                         subset_data = np.zeros((n, n), np.float32)
                         subset_band.readPixels(0, 0, n, n, subset_data)
@@ -535,11 +546,12 @@ def main():
                         if include_azm:
                             azm = str(truncate(azimuth_value, nr_dec))
 
+                        # Calculates mean and variance of subimage
                         mean = str(truncate(np.mean(subset_data), nr_dec))
                         var = str(truncate(np.var(subset_data) * 1000, nr_dec))
-
                         wave_str = str(truncate(wave_approx, 8))
 
+                        # Gives error message and discards image if time difference is to big
                         if abs(closest_time - date_as_unix) > 1800:
                             print('Time diff greater than 1800. Time diff: ' + str(abs(closest_time - date_as_unix)))
                             continue
@@ -554,6 +566,7 @@ def main():
                             write_op.dispose()
                             subset.dispose()
 
+
                         if will_write_csv:
                             with open(r'data\csv_output\params.csv', 'a', encoding='UTF8', newline='') as f:
                                 writer = csv.writer(f)
@@ -567,8 +580,10 @@ def main():
                 else:
                     kept_land += 1
 
+            # Saves the row as processed
             np.save(processed_rows_path, np.array([row]))
 
+        # Clears memory
         np.save(processed_rows_path, np.array([0]))
         sentinel_1.dispose()
         s1_preprocessed.dispose()
@@ -577,9 +592,11 @@ def main():
         print("File done!", "Time elapsed: " + str(time.time() - start_time_file))
         count += 1
 
+        # Saves the file as processed
         processed_files = np.load(processed_files_path, allow_pickle=True)
         processed_files = np.append(processed_files, folder)
         np.save(processed_files_path, processed_files)
+
 
 if __name__ == "__main__":
     main()
